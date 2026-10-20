@@ -38,51 +38,72 @@ function render() {
   // Match the reference's 48 px capitals and open tracking without stretching
   // the glyphs horizontally. The display font is separate from the settings UI.
   let size = 75;
-  let tracking = 2.6;
+  let tracking = 1.7;
   const characters = Array.from(text);
-  paint.font = `700 ${size}px DisplayTerminal, "Microsoft YaHei", sans-serif`;
+  paint.font = `600 ${size}px DisplayTerminal, "Microsoft YaHei", sans-serif`;
   const cap = paint.measureText('NETDIR');
   size *= 48 / (cap.actualBoundingBoxAscent + cap.actualBoundingBoxDescent);
-  paint.font = `700 ${size}px DisplayTerminal, "Microsoft YaHei", sans-serif`;
+  paint.font = `600 ${size}px DisplayTerminal, "Microsoft YaHei", sans-serif`;
   const getWidth = () => characters.reduce((total, char) => total + paint.measureText(char).width, 0) + Math.max(0, characters.length - 1) * tracking;
   const scale = Math.min(1, 1080 / getWidth());
   size *= scale; tracking *= scale;
-  paint.font = `700 ${size}px DisplayTerminal, "Microsoft YaHei", sans-serif`;
+  paint.font = `600 ${size}px DisplayTerminal, "Microsoft YaHei", sans-serif`;
   paint.textAlign = 'left'; paint.textBaseline = 'alphabetic';
+  // A small contour expansion gives a weight between SemiBold and Bold.
+  paint.lineWidth = 1.7 * scale;
+  paint.lineJoin = 'round';
   const metrics = paint.measureText(text);
   const baseline = 502 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
   const drawTrackedText = () => {
     let x = 859 - getWidth() / 2;
     for (const char of characters) {
+      paint.strokeText(char, x, baseline);
       paint.fillText(char, x, baseline);
       x += paint.measureText(char).width + tracking;
     }
   };
-  paint.fillStyle = '#08ffe5';
-  paint.shadowColor = 'rgba(0,255,225,.8)';
-  paint.shadowBlur = 20;
-  drawTrackedText();
-  paint.shadowColor = 'rgba(0,255,225,.95)';
-  paint.shadowBlur = 6;
-  drawTrackedText();
-  paint.shadowBlur = 0;
+  paint.fillStyle = '#12fae0';
+  paint.strokeStyle = paint.fillStyle;
   drawTrackedText();
 
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  // Scanlines belong to the phosphor strokes, not to the surrounding bloom.
+  paint.save(); paint.globalCompositeOperation = 'source-atop';
+  for (let y = 420; y < 585; y += 5) {
+    paint.fillStyle = 'rgba(8,45,31,.07)'; paint.fillRect(0, y, WIDTH, 2);
+    paint.fillStyle = 'rgba(215,255,245,.10)'; paint.fillRect(0, y + 2, WIDTH, 1);
+  }
+  paint.restore();
+
+  const strokes = document.createElement('canvas');
+  strokes.width = WIDTH; strokes.height = HEIGHT;
+  const strokeContext = strokes.getContext('2d');
   const amount = currentGlitch / 100;
   if (amount === 0) {
-    ctx.drawImage(layer, 0, 0);
+    strokeContext.drawImage(layer, 0, 0);
   } else for (let y = 420; y < 585; y += 2) {
     const active = randomAt(y) < amount * .55 && y > 470 && y < 532;
     const shift = active ? (randomAt(y + 8) - .5) * 34 * amount : 0;
-    ctx.drawImage(layer, 0, y, WIDTH, 2, shift, y, WIDTH, 2);
+    strokeContext.drawImage(layer, 0, y, WIDTH, 2, shift, y, WIDTH, 2);
   }
-  // Apply CRT bands only to the added lettering: the reference has its own bands.
-  ctx.save(); ctx.globalCompositeOperation = 'source-atop';
-  for (let y = 420; y < 585; y += 5) {
-    ctx.fillStyle = 'rgba(8,45,31,.07)'; ctx.fillRect(0, y, WIDTH, 2);
-    ctx.fillStyle = 'rgba(215,255,245,.12)'; ctx.fillRect(0, y + 2, WIDTH, 1);
+
+  // The reference has diffuse optical bloom, rather than a tight neon outline.
+  // A slightly pale halo lifts the surrounding panel instead of darkening it.
+  paint.clearRect(0, 0, WIDTH, HEIGHT);
+  paint.drawImage(strokes, 0, 0);
+  paint.globalCompositeOperation = 'source-in';
+  paint.fillStyle = '#54ffe8';
+  paint.fillRect(0, 0, WIDTH, HEIGHT);
+  paint.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  ctx.save();
+  for (const [radius, opacity] of [[34, .68], [13, .52], [3, .37]]) {
+    ctx.filter = `blur(${radius}px)`;
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(layer, 0, 0);
   }
+  ctx.globalAlpha = 1;
+  ctx.filter = 'blur(0.45px)';
+  ctx.drawImage(strokes, 0, 0);
   ctx.restore();
   canvas.setAttribute('aria-label', text);
   document.querySelector('#glitch-value').value = `${currentGlitch}%`;
@@ -134,7 +155,7 @@ document.querySelector('#copy-link').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(url.href); status.textContent = '已复制分享链接，打开即可显示这段文字。'; }
   catch { status.textContent = `请复制此链接：${url.href}`; }
 });
-const fontReady = document.fonts.load('700 75px DisplayTerminal').catch(() => []);
+const fontReady = document.fonts.load('600 75px DisplayTerminal').catch(() => []);
 document.querySelector('#download').addEventListener('click', async () => {
   try {
     await fontReady; await background.decode(); render();
