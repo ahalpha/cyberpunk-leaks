@@ -1,7 +1,7 @@
 'use strict';
 
 // Change this value to set the website's default lettering.
-const DEFAULT_TEXT = 'NETDIR://XXXXXXX.WEB';
+const DEFAULT_TEXT = 'NETDIR://AHALPHALEAKS.WEB';
 const DEFAULT_GLITCH = 0;
 const WIDTH = 1754, HEIGHT = 987;
 const STORAGE_KEY = 'netdir-display-v1';
